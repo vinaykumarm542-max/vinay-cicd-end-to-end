@@ -6,15 +6,21 @@ pipeline {
         DOCKER_USER = "vinaydocker542"
         GIT_CREDENTIALS_ID = "github-cred"
         DOCKER_CREDENTIALS_ID = "docker-cred"
-        K8S_MANIFEST_REPO = "https://github.com/vinaykumarm542-max/k8s-manifest-yamls.git"
+        K8S_MANIFEST_REPO = "git@github.com:vinaykumarm542-max/k8s-manifest-yamls.git"
     }
 
     stages {
-        
+        stage('Debug PATH') {
+            steps {
+                sh 'echo "Jenkins PATH: $PATH"'
+                sh 'which docker || echo "Docker not found"'
+            }
+        }
+
         stage('Checkout Python App Repo'){
             steps {
                 git credentialsId: "${GIT_CREDENTIALS_ID}", 
-                    url: 'https://github.com/vinaykumarm542-max/vinay-cicd-end-to-end.git',
+                    url: 'git@github.com:vinaykumarm542-max/vinay-cicd-end-to-end.git',
                     branch: 'main'
             }
         }
@@ -24,7 +30,7 @@ pipeline {
                 script{
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER_VAR', passwordVariable: 'DOCKER_PASS_VAR')]) {
                         sh '''
-                        echo "$DOCKER_PASS_VAR" | docker login -u $DOCKER_USER_VAR --password-stdin
+                        echo "$DOCKER_PASS_VAR" | /usr/local/bin/docker login -u $DOCKER_USER_VAR --password-stdin
                         echo 'Build Docker Image'
                         /usr/local/bin/docker build -t ${DOCKER_USER}/python-app:${IMAGE_TAG} .
                         '''
@@ -68,7 +74,7 @@ pipeline {
                         # Commit & push changes
                         git add deploy/*.yaml
                         git commit -m 'Updated K8S manifests with BUILD_NUMBER ${IMAGE_TAG} via Jenkins'
-                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/vinaykumarm542-max/k8s-manifest-yamls.git HEAD:main
+                        git push git@github.com:vinaykumarm542-max/k8s-manifest-yamls.git HEAD:main
                         '''                        
                     }
                 }
@@ -76,4 +82,3 @@ pipeline {
         }
     }
 }
-
