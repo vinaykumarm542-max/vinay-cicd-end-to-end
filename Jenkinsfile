@@ -1,63 +1,74 @@
 pipeline {
-    
     agent any 
-    
+
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
+        DOCKER_USER = "vinaydocker542"
+        GIT_CREDENTIALS_ID = "github-cred"
+        DOCKER_CREDENTIALS_ID = "docker-cred"
+        K8S_MANIFEST_REPO = "https://github.com/vinaykumarm542-max/k8s-manifest-yamls.git"
     }
-    
+
     stages {
         
-        stage('Checkout'){
-           steps {
-                git credentialsId: 'f87a34a8-0e09-45e7-b9cf-6dc68feac670', 
-                url: 'https://github.com/iam-veeramalla/cicd-end-to-end',
-                branch: 'main'
-           }
+        stage('Checkout Python App Repo'){
+            steps {
+                git credentialsId: "${GIT_CREDENTIALS_ID}", 
+                    url: 'https://github.com/vinaykumarm542-max/vinay-cicd-end-to-end.git',
+                    branch: 'main'
+            }
         }
 
-        stage('Build Docker'){
+        stage('Build Docker Image'){
             steps{
                 script{
-                    sh '''
-                    echo 'Buid Docker Image'
-                    docker build -t abhishekf5/cicd-e2e:${BUILD_NUMBER} .
-                    '''
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER_VAR', passwordVariable: 'DOCKER_PASS_VAR')]) {
+                        sh '''
+                        echo "$DOCKER_PASS_VAR" | docker login -u $DOCKER_USER_VAR --password-stdin
+                        echo 'Build Docker Image'
+                        docker build -t ${DOCKER_USER}/python-app:${IMAGE_TAG} .
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Push the artifacts'){
-           steps{
+        stage('Push Docker Image'){
+            steps{
                 script{
-                    sh '''
-                    echo 'Push to Repo'
-                    docker push abhishekf5/cicd-e2e:${BUILD_NUMBER}
-                    '''
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER_VAR', passwordVariable: 'DOCKER_PASS_VAR')]) {
+                        sh '''
+                        echo 'Push Docker Image to DockerHub'
+                        docker push ${DOCKER_USER}/python-app:${IMAGE_TAG}
+                        '''
+                    }
                 }
             }
         }
         
-        stage('Checkout K8S manifest SCM'){
+        stage('Checkout K8S Manifest Repo'){
             steps {
-                git credentialsId: 'f87a34a8-0e09-45e7-b9cf-6dc68feac670', 
-                url: 'https://github.com/iam-veeramalla/cicd-demo-manifests-repo.git',
-                branch: 'main'
+                git credentialsId: "${GIT_CREDENTIALS_ID}", 
+                    url: "${K8S_MANIFEST_REPO}",
+                    branch: 'main'
             }
         }
         
-        stage('Update K8S manifest & push to Repo'){
+        stage('Update K8S Manifests & Push'){
             steps {
                 script{
-                    withCredentials([usernamePassword(credentialsId: 'f87a34a8-0e09-45e7-b9cf-6dc68feac670', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CREDENTIALS_ID}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
                         sh '''
-                        cat deploy.yaml
-                        sed -i '' "s/32/${BUILD_NUMBER}/g" deploy.yaml
-                        cat deploy.yaml
-                        git add deploy.yaml
-                        git commit -m 'Updated the deploy yaml | Jenkins Pipeline'
-                        git remote -v
-                        git push https://github.com/iam-veeramalla/cicd-demo-manifests-repo.git HEAD:main
+                        # Update image tag in all manifest files in deploy directory
+                        for file in deploy/*.yaml; do
+                            sed -i '' "s|image:.*|image: ${DOCKER_USER}/python-app:${IMAGE_TAG}|g" "$file"
+                            cat "$file"
+                        done
+
+                        # Commit & push changes
+                        git add deploy/*.yaml
+                        git commit -m 'Updated K8S manifests with BUILD_NUMBER ${IMAGE_TAG} via Jenkins'
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/vinaykumarm542-max/k8s-manifest-yamls.git HEAD:main
                         '''                        
                     }
                 }
@@ -65,3 +76,4 @@ pipeline {
         }
     }
 }
+
