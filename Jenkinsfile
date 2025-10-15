@@ -26,7 +26,7 @@ pipeline {
                         sh '''
                         echo "$DOCKER_PASS_VAR" | docker login -u $DOCKER_USER_VAR --password-stdin
                         echo 'Build Docker Image'
-                        docker build -t ${DOCKER_USER}/python-app:${IMAGE_TAG} .
+                        /usr/local/bin/docker build -t ${DOCKER_USER}/python-app:${IMAGE_TAG} .
                         '''
                     }
                 }
@@ -39,7 +39,7 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER_VAR', passwordVariable: 'DOCKER_PASS_VAR')]) {
                         sh '''
                         echo 'Push Docker Image to DockerHub'
-                        docker push ${DOCKER_USER}/python-app:${IMAGE_TAG}
+                        /usr/local/bin/docker push ${DOCKER_USER}/python-app:${IMAGE_TAG}
                         '''
                     }
                 }
